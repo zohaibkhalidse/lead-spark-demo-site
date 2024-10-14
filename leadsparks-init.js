@@ -46,7 +46,7 @@
     try {
       const token = localStorage.getItem("session_token");
       const tokenResponse = await fetch(
-        `${apiUrl}/api/generate-token?stream_id=${streamId}&session_token=${token}`
+          `${apiUrl}/api/generate-token?stream_id=${streamId}&session_token=${token}`
       );
       const tokenData = await tokenResponse.json();
       if (!tokenResponse.ok) {
@@ -54,6 +54,11 @@
       }
       const sessionToken = tokenData.session.session_token;
       localStorage.setItem("session_token", sessionToken);
+
+      if (!token) {
+        localStorage.setItem("isNewToken", true);
+        window.location.reload();
+      }
 
       const leadSparks = document.querySelector("#leadsparks_load_target");
       if (tokenData.success) {
@@ -67,14 +72,17 @@
         leadSparks.appendChild(iframe);
 
         iframe.onload = () => {
+          console.log('iframe loading')
           const requestIframeHandshake = () => {
+            console.log('request-handshake loading')
             const origin = new URL(iframe.src).origin;
             iframe.contentWindow.postMessage(
-              {
-                type: "request-handshake",
-                sessionToken,
-              },
-              origin
+                {
+                  type: "request-handshake",
+                  sessionToken,
+                  isNewToken: localStorage.getItem("isNewToken"),
+                },
+                origin
             );
           };
 
@@ -84,19 +92,19 @@
             const secureToken = sessionToken;
             if (event.data === "handshake-init") {
               const origin = new URL(iframe.src).origin;
-              console.log(secureToken)
               iframe.contentWindow.postMessage(
-                { type: "handshake", token: secureToken },
-                origin
+                  { type: "handshake", token: secureToken },
+                  origin
               );
             } else if (
-              event.data.type === "handshake-ack" &&
-              event.data.token === secureToken
+                event.data.type === "handshake-ack" &&
+                event.data.token === secureToken
             ) {
               console.log("Handshake successful");
+              localStorage.removeItem("isNewToken")
             } else if (event.data.type === "cors-error") {
               console.error(
-                "CORS Error: The origin of the request is not allowed. Please check the allowed domains or contact support for assistance."
+                  "CORS Error: The origin of the request is not allowed. Please check the allowed domains or contact support for assistance."
               );
             }
           });
@@ -105,6 +113,9 @@
         leadSparks.innerHTML = errorContent;
       }
     } catch (error) {
+      console.log('error', error)
+      localStorage.clear();
+      window.location.reload();
       const leadSparks = document.querySelector("#leadsparks_load_target");
       leadSparks.innerHTML = errorContent;
     }
